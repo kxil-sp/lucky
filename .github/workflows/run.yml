@@ -1,22 +1,17 @@
-name: Dice Arena Speedrun
+name: Run Socket Solver
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch: # Qo'lda ishga tushirish uchun
+  workflow_dispatch:
 
 jobs:
-  exploit:
+  run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Run Speedrun Script
-        run: python speedrun.py
+      - run: python speedrun.py
