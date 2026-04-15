@@ -3,9 +3,16 @@
 import socket
 import re
 import time
+import hashlib
 
 HOST = "154.57.164.81"
 PORT = 30415
+
+# oddiy wordlist (kengaytirsa bo‘ladi)
+WORDLIST = [
+    "hello", "world", "test", "admin", "password",
+    "123456", "qwerty", "flag", "ctf", "secret"
+]
 
 def recv(sock, timeout=3):
     sock.setblocking(0)
@@ -27,13 +34,21 @@ def recv(sock, timeout=3):
 
 
 def find_hash(text):
-    # 40-length hex = SHA1
-    match = re.findall(r"\b[a-f0-9]{40}\b", text)
-    return match
+    return re.findall(r"\b[a-f0-9]{40}\b", text)
+
+
+def crack_sha1(hash_value):
+    for word in WORDLIST:
+        if hashlib.sha1(word.encode()).hexdigest() == hash_value:
+            return word
+    return None
 
 
 def main():
+    print(f"🔌 Connecting to {HOST}:{PORT}")
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(5)
         s.connect((HOST, PORT))
 
         while True:
@@ -47,10 +62,20 @@ def main():
 
             if hashes:
                 for h in hashes:
-                    print(f"📤 Sending: {h}")
-                    s.sendall((h + "\n").encode())
+                    print(f"🔍 Found hash: {h}")
+
+                    # 1. Avval crack qilib ko‘ramiz
+                    cracked = crack_sha1(h)
+
+                    if cracked:
+                        print(f"🔓 Cracked: {cracked}")
+                        s.sendall((cracked + "\n").encode())
+                    else:
+                        # 2. Bo‘lmasa echo qilib yuboramiz
+                        print(f"📤 Sending raw hash")
+                        s.sendall((h + "\n").encode())
             else:
-                # fallback (enter)
+                # fallback
                 s.sendall(b"\n")
 
             if "flag" in data.lower():
