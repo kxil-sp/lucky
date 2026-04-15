@@ -1,12 +1,13 @@
 # speedrun.py
 
 import socket
+import re
 import time
 
 HOST = "154.57.164.81"
 PORT = 30415
 
-def recv_until_timeout(sock, timeout=3):
+def recv(sock, timeout=3):
     sock.setblocking(0)
     data = b""
     start = time.time()
@@ -15,47 +16,46 @@ def recv_until_timeout(sock, timeout=3):
         if time.time() - start > timeout:
             break
         try:
-            chunk = sock.recv(4096)
-            if chunk:
-                data += chunk
-                start = time.time()  # reset timeout if data comes
+            part = sock.recv(4096)
+            if part:
+                data += part
+                start = time.time()
         except:
             pass
 
     return data.decode(errors="ignore")
 
 
-def main():
-    print(f"🔌 Connecting to {HOST}:{PORT} ...")
+def find_hash(text):
+    # 40-length hex = SHA1
+    match = re.findall(r"\b[a-f0-9]{40}\b", text)
+    return match
 
+
+def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(5)
         s.connect((HOST, PORT))
 
-        # 1. Server banner / savol
-        banner = recv_until_timeout(s, timeout=5)
-        print("📥 Server:")
-        print(banner)
+        while True:
+            data = recv(s, timeout=5)
+            if not data:
+                break
 
-        # 2. Agar hash ko‘rsak → yuboramiz
-        if "a26af69be951a213d495a4c3e4e4022e16d87065" in banner:
-            payload = "a26af69be951a213d495a4c3e4e4022e16d87065\n"
-            print(f"📤 Sending hash...")
-            s.sendall(payload.encode())
+            print("📥", data)
 
-        # 3. Generic input (ba'zi challar ENTER kutadi)
-        s.sendall(b"\n")
+            hashes = find_hash(data)
 
-        # 4. Javobni olish
-        response = recv_until_timeout(s, timeout=5)
-        print("📩 Response:")
-        print(response)
+            if hashes:
+                for h in hashes:
+                    print(f"📤 Sending: {h}")
+                    s.sendall((h + "\n").encode())
+            else:
+                # fallback (enter)
+                s.sendall(b"\n")
 
-        # 5. Flag check
-        if "flag" in response.lower():
-            print("🏁 FLAG FOUND!")
-        else:
-            print("❌ Flag topilmadi (yana step bo‘lishi mumkin)")
+            if "flag" in data.lower():
+                print("🏁 FLAG FOUND!")
+                break
 
 
 if __name__ == "__main__":
